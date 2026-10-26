@@ -1,0 +1,112 @@
+:root {
+  --fg: #e4e4e4;
+}
+html, body {
+  margin: 0;
+  height: 100%;
+  background: #000;
+  overflow: hidden;
+  -webkit-text-size-adjust: none;
+  text-size-adjust: none;
+}
+body {
+  position: fixed;
+  inset: 0;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+  -webkit-tap-highlight-color: transparent;
+  overscroll-behavior: none;
+  touch-action: none;
+  cursor: default;
+}
+[hidden] { display: none !important; }
+
+/* Text console: fills the screen, scrolls like a terminal (newest line at the bottom). */
+#screen {
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+  background: #000;
+  box-sizing: border-box;
+  padding: 2px 2px 0 3px;
+}
+#screen.pongo { --fs: 8.5px; --lh: 1.2; --fw: 700; }
+#screen.xnu   { --fs: 7px;   --lh: 1.2; --fw: 400; }
+#console {
+  font: var(--fw) var(--fs) / var(--lh) Menlo, Monaco, ui-monospace, "SF Mono", "DejaVu Sans Mono", "Liberation Mono", Consolas, monospace;
+  color: var(--fg);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  word-break: break-all;
+  tab-size: 8;
+}
+
+/* Pixel-art logo drawn over the console. */
+#logo {
+  position: fixed;
+  left: 50%;
+  top: 70%;
+  transform: translate(-50%, -50%);
+  image-rendering: crisp-edges;
+  image-rendering: pixelated;
+  pointer-events: none;
+}
+
+/* Final phase: Apple logo with boot progress bar. */
+#apple {
+  position: fixed;
+  inset: 0;
+  background: #000;
+}
+#applelogo {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 72px;
+  height: 72px;
+  transform: translate(-50%, -58%);
+  fill: #fff;
+}
+#track {
+  position: absolute;
+  left: 50%;
+  top: 64%;
+  width: 150px;
+  height: 4px;
+  transform: translateX(-50%);
+  background: #2a2a2c;
+  border-radius: 2px;
+  overflow: hidden;
+}
+#bar {
+  width: 0;
+  height: 100%;
+  background: #fff;
+  border-radius: 2px;
+  transition: width 0.9s ease-out;
+}
+
+/* Small helper texts. */
+#hint {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: calc(14px + env(safe-area-inset-bottom));
+  text-align: center;
+  color: #3c3c3e;
+  font: 11px -apple-system, system-ui, sans-serif;
+  letter-spacing: 0.02em;
+}
+#install {
+  position: fixed;
+  left: 16px;
+  right: 16px;
+  bottom: calc(18px + env(safe-area-inset-bottom));
+  padding: 10px 14px;
+  border-radius: 10px;
+  background: #1c1c1e;
+  color: #d0d0d0;
+  font: 13px -apple-system, system-ui, sans-serif;
+  text-align: center;
+}
