@@ -1,6 +1,6 @@
 # liveboot
 
-A fake iPhone "liveboot": a pongoOS-style console, a wall of verbose boot text, then the Apple logo with a boot progress bar. It is a one-shot prop that runs for 45 seconds and then stops. Nothing loops, no line is ever repeated, and nothing is real: it is plain HTML, CSS and JavaScript drawing text on a black page.
+A fake iPhone "liveboot": a pongoOS-style console, a wall of verbose boot text, then the Apple logo with a boot progress bar. It is a one-shot prop that runs for 60 seconds and then stops. Nothing loops, no line is ever repeated, and nothing is real: it is plain HTML, CSS and JavaScript drawing text on a black page.
 
 It is packaged as a Progressive Web App and **only runs when launched from the Home Screen**. Opened in a normal browser tab it shows install instructions instead, so the boot can never play inside Safari's chrome. Once installed it opens full screen on black and works offline.
 
@@ -10,9 +10,9 @@ It is packaged as a Progressive Web App and **only runs when launched from the H
 |---|---|---|
 | 0 s | black | screen stays dark for a moment |
 | 0.6 s | pongoOS console | the whole banner at once, then `sep pwn` / `sep boot`, then the pixel logo centred on screen |
-| 10 s | verbose boot | about 300 kernel/driver style lines flying by in bursts, with a few short stalls |
-| 33 s | Apple logo | logo centred, progress bar below it filling in steps |
-| 45 s | done | bar is full; a few seconds later a dim "tap to run again" appears |
+| 10 s | verbose boot | about 500 kernel/driver style lines flowing past; every pause is under half a second |
+| 49 s | Apple logo | logo centred, progress bar below it filling in steps |
+| 60 s | done | bar is full; a few seconds later a dim "tap to run again" appears |
 
 After it finishes, a tap anywhere starts a fresh run. It never restarts on its own.
 
@@ -51,6 +51,7 @@ Bump `CACHE` in `sw.js` whenever you change files, so installed copies pick up t
 
 ## Limits worth knowing
 
+- The console starts just below the status bar (`env(safe-area-inset-top)`), because iOS 26 blurs anything drawn underneath its frosted status bar.
 - iOS always draws the clock, signal and battery over Home Screen web apps. The only control a page has is the status-bar *style* (default, black, black-translucent); none of them hides it, and iPhone has no Fullscreen API for page content. This app uses black-translucent so the icons float over the black console rather than sitting in a separate bar.
 - The screen wake lock is requested where the browser supports it (iOS 16.4+); otherwise the normal auto-lock timer applies.
 - If the app is sent to the background mid-run, the timeline pauses and continues from the same point when it returns.

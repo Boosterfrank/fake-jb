@@ -1,7 +1,7 @@
 {
   "name": "liveboot",
   "short_name": "liveboot",
-  "description": "Fake pongoOS / verbose boot screen. One run of about 45 seconds, no loops.",
+  "description": "Fake pongoOS / verbose boot screen. One run of 60 seconds, no loops.",
   "start_url": "./",
   "scope": "./",
   "display": "fullscreen",

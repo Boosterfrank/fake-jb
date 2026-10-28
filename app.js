@@ -77,7 +77,7 @@
   /* ---------------- Phase 2: verbose boot text ----------------
    * Strings are lines; numbers are pauses (ms) between bursts. Generated sections use
    * fixed tables plus the seeded generator above, so every run prints the same unique lines. */
-  var DT_NODES = ['aic@20e100000', 'pmgr@20e000000', 'gpio@20f100000', 'spmi@20f200000', 'pmgr-dvfm',
+  var DT_NODES = ['aic@20e100000', 'pmgr@20e000000', 'gpio@20f100000', 'spmi@20f200000', 'pmgr-dvfm@20e0a0000',
     'i2c0@20e280000', 'i2c1@20e2a0000', 'i2c2@20e2c0000', 'spi0@20e300000', 'spi1@20e320000', 'spi2@20e340000',
     'spi3@20e360000', 'uart0@20e600000', 'uart1@20e620000', 'uart4@20e680000', 'uart8@20e6f0000',
     'dart-usb@20e900000', 'dart-sio@20ea00000', 'dart-disp0@20eb00000', 'dart-isp@20ec00000', 'dart-ave@20ed00000',
@@ -85,6 +85,20 @@
     'ans@213000000', 'aop@214000000', 'sep@215000000', 'isp@216000000', 'disp0@217000000', 'jpeg@218000000',
     'scaler@219000000', 'ave@21a000000', 'avd@21b000000', 'agx@21c000000', 'apcie@21d000000',
     'baseband-spmi@21e000000', 'mca0@21f000000', 'dwi@220000000', 'wdt@221000000', 'mcc@222000000'];
+  var DRIVERS = { aic: 'AppleInterruptController', pmgr: 'ApplePMGR', gpio: 'AppleGPIO', spmi: 'AppleSPMI',
+    'pmgr-dvfm': 'AppleDVFM', 'usb-drd': 'AppleUSBDRD', 'usb-complex': 'AppleUSBComplex', sio: 'AppleSIO',
+    ans: 'AppleNVMe', aop: 'AppleAOP', sep: 'AppleSEPManager', isp: 'AppleISP', disp0: 'AppleDisplay',
+    jpeg: 'AppleJPEG', scaler: 'AppleScaler', ave: 'AppleVideoEncoder', avd: 'AppleVideoDecoder', agx: 'AppleGPU',
+    apcie: 'ApplePCIe', 'baseband-spmi': 'AppleBasebandSPMI', mca0: 'AppleMCA', dwi: 'AppleDWI',
+    wdt: 'AppleWatchdog', mcc: 'AppleMCC' };
+  function driverFor(name) {
+    if (DRIVERS[name]) return DRIVERS[name];
+    if (name.indexOf('i2c') === 0) return 'AppleI2C';
+    if (name.indexOf('spi') === 0) return 'AppleSPI';
+    if (name.indexOf('uart') === 0) return 'AppleUART';
+    if (name.indexOf('dart') === 0) return 'AppleDART';
+    return 'AppleARMIODevice';
+  }
   var KEXTS = [['com.apple.driver.AppleARMPlatform', '1.0.2'], ['com.apple.iokit.IOStorageFamily', '2.1'],
     ['com.apple.iokit.IONetworkingFamily', '3.4'], ['com.apple.iokit.IOHIDFamily', '2.0.0'],
     ['com.apple.iokit.IOUSBHostFamily', '1.2'], ['com.apple.iokit.IOPCIFamily', '2.9'],
@@ -109,212 +123,243 @@
     ['com.apple.filesystems.apfs', '1412.141.1'], ['com.apple.filesystems.hfs.kext', '522.100.5'],
     ['com.apple.nke.ppp', '1.9'], ['com.apple.nke.l2tp', '1.9'],
     ['com.apple.security.sandbox', '300.0'], ['com.apple.security.quarantine', '4']];
-  var VM_REGIONS = [['kernel text', 'r-x'], ['kernel data', 'rw-'], ['kernel bss', 'rw-'], ['prelinked kexts', 'r-x'],
-    ['device tree', 'r--'], ['boot-args', 'r--'], ['trust cache', 'r--'], ['sep firmware', 'r--'],
-    ['framebuffer', 'rw-'], ['iboot data', 'r--']];
+  var VM_REGIONS = [['kernel text', 'r-x', 23900], ['kernel data', 'rw-', 4100], ['kernel bss', 'rw-', 1800],
+    ['prelinked kexts', 'r-x', 31200], ['device tree', 'r--', 512], ['boot-args', 'r--', 4],
+    ['trust cache', 'r--', 1536], ['sep firmware', 'r--', 1024], ['framebuffer', 'rw-', 8100], ['iboot data', 'r--', 256]];
+  var ZONES = [['kalloc.16', 16], ['kalloc.32', 32], ['kalloc.48', 48], ['kalloc.64', 64], ['kalloc.96', 96],
+    ['kalloc.128', 128], ['kalloc.256', 256], ['kalloc.512', 512], ['kalloc.1024', 1024], ['kalloc.2048', 2048],
+    ['vm.pages', 64], ['vm.map.entries', 80], ['proc', 1184], ['threads', 616], ['uthreads', 400],
+    ['ipc.ports', 168], ['ipc.spaces', 128], ['vnodes', 248], ['bufs', 368], ['mbufs', 256]];
   var SENSORS = [['cpu-die', 31], ['gpu-die', 29], ['soc', 30], ['pmu', 28], ['battery', 26], ['charger', 27],
     ['display', 25], ['baseband', 29], ['nand', 28]];
+  var DOMAINS = ['cpu', 'gpu', 'disp', 'isp', 'ave', 'avd', 'usb', 'pcie', 'nvme', 'sep', 'aop', 'baseband'];
+  var MODES = [['1334x750', 60, 74], ['1334x750', 30, 37], ['1334x750', 24, 30], ['667x375', 60, 19]];
+  var CHANNELS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 36, 40, 44, 48, 149, 153, 157, 161];
   var SELFTEST = ['aes-ecb', 'aes-cbc', 'aes-gcm', 'sha1', 'sha256', 'sha512', 'hmac-sha256', 'rsa-sig',
     'ecdsa-p256', 'drbg-ctr'];
   var SLICES = [['0x000028', '0x0a1fff', 'system', 'System'], ['0x0a2000', '0xef5fff', 'data', 'Data'],
     ['0xef6000', '0xf0dfff', 'baseband', 'Baseband'], ['0xf0e000', '0xf11fff', 'nvram', 'NVRAM']];
+  var DAEMONS_A = ['securityd', 'configd', 'notifyd', 'powerd', 'logd', 'mediaserverd', 'locationd', 'wifid',
+    'bluetoothd', 'CommCenter', 'mobile.lockdown', 'imagent', 'cloudd', 'backupd', 'assistantd', 'nfcd',
+    'biometrickitd', 'trustd', 'coreduetd', 'symptomsd', 'healthd'];
+  var DAEMONS_B = ['accessoryd', 'accountsd', 'aggregated', 'akd', 'analyticsd', 'appstored', 'audiomxd', 'bird',
+    'cfprefsd', 'contextstored', 'coreaudiod', 'dasd', 'dataaccessd', 'diagnosticd', 'distnoted', 'duetexpertd',
+    'fairplayd', 'fseventsd', 'geod', 'itunesstored', 'keybagd', 'mDNSResponder', 'mediaremoted', 'misd',
+    'mobileassetd', 'nanoregistryd', 'nehelper', 'nsurlsessiond', 'passd', 'powerlogHelperd', 'profiled', 'routined',
+    'runningboardd', 'searchpartyd', 'siriknowledged', 'softwareupdated', 'tccd', 'timed', 'usermanagerd', 'watchdogd'];
+  var DAEMONS_C = ['mobileactivationd', 'apsd', 'identityservicesd', 'rapportd', 'sharingd', 'searchd', 'suggestd',
+    'homed', 'calaccessd', 'UserEventAgent (System)'];
 
-  var XNU = [
-    'iBoot version: iBoot-5540.140.12',
-    'Darwin Kernel Version 19.5.0: Tue Apr 21 22:17:45 PDT 2020; root:xnu-6153.122.1~1/RELEASE_ARM64_T8010',
-    'kernelcache: prelinked, text 23.9 MB, data 4.1 MB, 212 kexts',
-    'mem actual: 0x80000000, usable: 0x7a600000',
-    'cpu: 2 cores online (1 fusion domain), 2 clusters',
-    'boot-args = serial=3 -v',
-    'standard timeslicing quantum is 10000 us',
-    'standard background quantum is 2500 us',
-    'vm_compressor_mode is 4',
-    'entropy source: 512 bytes from boot loader'
-  ];
-  var base = 0x8000;
-  VM_REGIONS.forEach(function (r, i) {
-    var size = [23900, 4100, 1800, 31200, 512, 4, 1536, 1024, 8100, 256][i];
-    var start = base + i * 0x80, end = start + 0x7f;
-    XNU.push('vm: region ' + i + ' 0xfffffff' + start.toString(16) + '0000-0xfffffff' + end.toString(16) + 'ffff ' +
-      size + ' KB ' + r[1] + ' ' + r[0]);
-  });
-  XNU.push(250,
-    'MAC Framework successfully initialized',
-    'using 16384 buffer headers and 10240 cluster IO buffer headers',
-    'IOKit Component Version 19.5.0',
-    'IORegistry: 1 root, building device tree from boot loader (1411 nodes)',
-    'AppleARMPlatform: starting, board D10AP',
-    'AppleARMIO: probing bus 0 ... 12 devices',
-    'AppleARMIO: probing bus 1 ... 7 devices',
-    'AppleInterruptController: 320 vectors, 2 targets',
-    'AppleWatchdog: disabled by boot-args',
-    'AppleClockManager: 61 clocks registered',
-    'AppleDART: 14 units configured, bypass disabled',
-    'AppleAES: hardware engine ready',
-    'AppleUART: console on uart0 @ 115200 (serial=3)',
-    200);
-  DT_NODES.forEach(function (n, i) {
-    XNU.push('IODeviceTree: /arm-io/' + n + ' (' + (7 + (i * 5) % 23) + ' properties, ' + (i % 4) + ' children)');
-  });
-  XNU.push(400);
-  KEXTS.forEach(function (k) { XNU.push('kext: ' + k[0] + ' (' + k[1] + ') loaded'); });
-  XNU.push('kext: 212 kexts in prelinked cache, 48 started early, rest on demand',
-    700,
-    'AppleSPMI: 2 controllers, 43 devices enumerated',
-    'ApplePMU: revision 3, 11 regulators online',
-    'ApplePMU: charger: battery 73% (4089 mV), external power: no',
-    'AppleTemp: 9 thermal sensors registered');
-  SENSORS.forEach(function (s) { XNU.push('AppleTemp: ' + s[0] + ' = ' + s[1] + '.' + Math.floor(rnd() * 10) + ' C'); });
-  XNU.push('AppleAOP: firmware 1.3.0 loaded (RTKit), 3 endpoints',
-    'AppleAOP: syslog relay enabled',
-    'AppleSensorHub: accelerometer (0x4), gyro (0x8), compass (0x10) online',
-    'AppleAmbientLight: sensor calibrated, 5 gain stages',
-    'AppleHaptics: engine ready, 2 waveform banks',
-    900,
-    'AppleDisplay: panel 1334x750 @ 60 Hz, 8-bit, color mode P3',
-    'AppleDisplay: backlight 0 -> 0 (boot, keep off)',
-    'AppleFramebuffer: 2 layers, 1 overlay, swap interval 1',
-    'AppleGPU: 6 cores, firmware v34.1, 1 GB shared',
-    'AppleGPU: compute ring 0 ready, ring 1 ready',
-    'AppleScaler: 2 pipelines, color space conversion online',
-    'AppleJPEG: hardware codec ready',
-    'AppleVideoEncoder: hardware encoder online (H.264/HEVC)',
-    'AppleVideoDecoder: hardware decoder online',
-    'AppleISP: camera firmware loaded, 2 sensors paired',
-    'AppleAudio: codec ready, 2 outputs 3 inputs, 48 kHz',
-    'AppleAudio: speaker protection table version 7',
-    1800,
-    'AppleNVMe: controller ready, firmware 0.1.5',
-    'AppleNVMe: 128 GB, namespace 1 ready, 2 queues of depth 64');
-  SLICES.forEach(function (s, i) {
-    XNU.push('AppleStorage: slice ' + (i + 1) + ' lba ' + s[0] + '-' + s[1] + ' type ' + s[2] + ' uuid ' +
-      hex(8).toUpperCase() + '-' + hex(4).toUpperCase() + ' "' + s[3] + '"');
-  });
-  XNU.push('AppleEffaceable: 2 lockers online',
-    'apfs: module loaded (1412.141.1)',
-    'apfs: container 0 found, 2 volumes, 128 GB',
-    'apfs: mounted volume "System" (read-only, snapshot)',
-    'apfs: mounted volume "Data" (read-write, 96.3 GB free)',
-    'BSD root: disk0s1s1, major 1, minor 1',
-    'bsd_init: rootvnode ok, /dev populated (144 nodes)',
-    'kern.bootsessionuuid = 5A2C7E1B-9F1C-4D2A-8C4B-0E7F6A1D3B92',
-    2800,
-    'apfs: verifying container checkpoint ... ok (41 ms)',
-    'apfs: volume "Data" journal replay: 0 transactions',
-    'apfs: snapshot "com.apple.os.update-4C1F2A" sealed, 0 differences',
-    'apfs: keybag unlocked for volume "Data" (class A pending)',
-    'apfs: trim: 18.2 GB queued for discard',
-    'mount: /private/var mounted from disk0s1s2',
-    900,
-    'AppleUSB: host controller online, 1 port (type-A off, lightning on)',
-    'AppleUSB: device mode ready, 3 configurations',
-    'AppleUSBEthernet: interface en2 registered',
-    'AppleWiFi: firmware 9.30.440 loaded, 2 radios (2.4/5 GHz)',
-    'AppleWiFi: interface en0 registered, country code resolved',
-    'AppleBluetooth: firmware loaded, host interface online',
-    'AppleBaseband: PCIe link up (gen 1, x1)',
-    'AppleBaseband: modem firmware 1.07.02 loaded',
-    'AppleBaseband: SIM tray: present',
-    'AppleNFC: controller ready',
-    'AppleLocation: GNSS receiver online, 0 satellites',
-    1300,
-    'AppleTouch: digitizer calibrated, 16x9 sense grid',
-    'AppleButtons: 4 inputs (power, volume up, volume down, ringer)',
-    'AppleHome: home button pressure sensor paired',
-    'AppleBiometric: sensor paired, template store locked',
-    'AppleKeyStore: starting (BUILT: Apr 21 2020 22:08:31)',
-    'AppleSEP: secure enclave link established, 4 mailboxes',
-    'AppleSEP: firmware version 1.0 (build 1738)',
-    'AppleSEPKeyStore: starting, protection classes 1-4 loaded',
-    'AppleCredentialManager: init: called',
-    'AppleCredentialManager: start: initializing power management',
-    'AppleCredentialManager: start: started',
-    'AppleSSE: key manager online',
-    'AppleTrustCache: 1 cache loaded (static)');
-  SELFTEST.forEach(function (a, i) {
-    XNU.push('corecrypto: self-test ' + a + ' vector ' + (i + 1) + ': ' + hex(32) + ' ok (' + (i % 3) + ' ms)');
-  });
-  XNU.push(2000,
-    'IOSurface: root ready, 0 surfaces',
-    'IOAccelerator: 1 device registered',
-    'IOMobileFramebuffer: display 0 attached, 4 timing modes',
-    'IOHID: event system ready, 7 services',
-    'IOPower: 3 power planes, 2 sleep states',
-    'IONetworking: 3 interfaces, loopback up',
-    'IOAudio: 1 engine, 2 streams',
-    'IOThermal: policy table loaded (12 entries)',
-    'IOReport: 41 channels registered',
-    'IOTimeSync: clock domain 0 ready',
-    'IOText: 1 encryption provider',
-    1900,
-    'Darwin Bootstrapper Version 6.0.0: Tue Apr 21 22:22:35 PDT 2020; root:libxpc_private-1738.140.1~1/RELEASE_ARM64_T8010',
-    'launchd: reading /System/Library/LaunchDaemons (214 plists)',
-    'launchd: reading /Library/LaunchDaemons (0 plists)',
-    'launchd: loading system services (214 jobs)',
-    'launchd: starting com.apple.securityd',
-    'launchd: starting com.apple.configd',
-    'launchd: starting com.apple.notifyd',
-    'launchd: starting com.apple.powerd',
-    'launchd: starting com.apple.logd',
-    'launchd: starting com.apple.mediaserverd',
-    'launchd: starting com.apple.locationd',
-    'launchd: starting com.apple.wifid',
-    'launchd: starting com.apple.bluetoothd',
-    'launchd: starting com.apple.CommCenter',
-    'launchd: starting com.apple.mobile.lockdown',
-    'launchd: starting com.apple.imagent',
-    'launchd: starting com.apple.cloudd',
-    'launchd: starting com.apple.backupd',
-    'launchd: starting com.apple.assistantd',
-    'launchd: starting com.apple.nfcd',
-    'launchd: starting com.apple.biometrickitd',
-    'launchd: starting com.apple.trustd',
-    'launchd: starting com.apple.coreduetd',
-    'launchd: starting com.apple.symptomsd',
-    'launchd: starting com.apple.healthd',
-    900,
-    'securityd: keychain opened, 3 keybags',
-    'configd: network configuration loaded, 3 services',
-    'configd: setting hostname to iPhone',
-    'powerd: assertion table ready, 0 assertions',
-    'logd: 2 log stores, 64 MB each',
-    'mediaserverd: 1 audio session, 0 active',
-    'locationd: 0 clients, GNSS idle',
-    'wifid: scanning 0 networks (radio off until unlock)',
-    'bluetoothd: 0 paired devices (store locked)',
-    'CommCenter: baseband attached, radio idle',
-    'lockdown: pairing records: 1',
-    'trustd: 1 trust store, 160 roots',
-    'nfcd: field off',
-    1000,
-    'launchd: starting com.apple.mobileactivationd',
-    'launchd: starting com.apple.apsd',
-    'launchd: starting com.apple.identityservicesd',
-    'launchd: starting com.apple.rapportd',
-    'launchd: starting com.apple.sharingd',
-    'launchd: starting com.apple.searchd',
-    'launchd: starting com.apple.suggestd',
-    'launchd: starting com.apple.homed',
-    'launchd: starting com.apple.calaccessd',
-    'launchd: starting com.apple.UserEventAgent (System)',
-    'apsd: push transport idle, 0 channels',
-    'mobileactivationd: activation record present, state: activated',
-    'identityservicesd: 0 accounts loaded',
-    900,
-    'launchd: starting com.apple.backboardd',
-    'backboardd: display 0 claimed, 1 layer',
-    'backboardd: hid: 7 services attached',
-    'backboardd: boot UI: progress bar',
-    'launchd: starting com.apple.SpringBoard',
-    'SpringBoard: 1 display, 1 home screen, 0 pending installs',
-    'SpringBoard: boot: handing display to boot UI',
-    4300);
-  // Deterministic short gaps inside a burst (ms), cycled.
-  var GAP = [0, 10, 0, 22, 5, 0, 35, 8, 0, 14, 0, 0, 28, 3, 50, 0, 9, 0, 18, 6];
+  /* Verbose boot text: strings are lines, numbers are pauses (ms) between bursts. Every pause is
+   * under half a second so the text keeps flowing. All lines are unique. */
+  function buildXNU() {
+    var L = [];
+    var push = function () { for (var i = 0; i < arguments.length; i++) L.push(arguments[i]); };
+
+    push('iBoot version: iBoot-5540.140.12',
+      'Darwin Kernel Version 19.5.0: Tue Apr 21 22:17:45 PDT 2020; root:xnu-6153.122.1~1/RELEASE_ARM64_T8010',
+      'kernelcache: prelinked, text 23.9 MB, data 4.1 MB, 212 kexts',
+      'mem actual: 0x80000000, usable: 0x7a600000',
+      'cpu: 2 cores online (1 fusion domain), 2 clusters',
+      'boot-args = serial=3 -v',
+      'standard timeslicing quantum is 10000 us',
+      'standard background quantum is 2500 us',
+      'vm_compressor_mode is 4',
+      'entropy source: 512 bytes from boot loader');
+    VM_REGIONS.forEach(function (r, i) {
+      var start = 0x8000 + i * 0x80, end = start + 0x7f;
+      push('vm: region ' + i + ' 0xfffffff' + start.toString(16) + '0000-0xfffffff' + end.toString(16) + 'ffff ' +
+        r[2] + ' KB ' + r[1] + ' ' + r[0]);
+    });
+    push(300,
+      'MAC Framework successfully initialized',
+      'using 16384 buffer headers and 10240 cluster IO buffer headers',
+      'IOKit Component Version 19.5.0',
+      'IORegistry: 1 root, building device tree from boot loader (1411 nodes)',
+      'AppleARMPlatform: starting, board D10AP',
+      'AppleARMIO: probing bus 0 ... 12 devices',
+      'AppleARMIO: probing bus 1 ... 7 devices',
+      'AppleInterruptController: 320 vectors, 2 targets',
+      'AppleWatchdog: disabled by boot-args',
+      'AppleClockManager: 61 clocks registered',
+      'AppleDART: 14 units configured, bypass disabled',
+      'AppleAES: hardware engine ready',
+      'AppleUART: console on uart0 @ 115200 (serial=3)',
+      250);
+    ZONES.forEach(function (z, i) {
+      var elems = 256 + ((i * 7919) % 4096) * 4;
+      push('zone: ' + z[0] + ': ' + elems + ' elements of ' + z[1] + ' bytes, ' + Math.ceil(elems * z[1] / 16384) + ' pages');
+    });
+    push(350);
+    DT_NODES.forEach(function (n, i) {
+      var name = n.split('@')[0], addr = n.split('@')[1];
+      push('IODeviceTree: /arm-io/' + n + ' (' + (7 + (i * 5) % 23) + ' properties, ' + (i % 4) + ' children)');
+      push('IODeviceTree: /arm-io/' + name + ': reg 0x' + addr + ' size 0x' + (0x1000 * (1 + i % 16)).toString(16) +
+        ', interrupts [' + (32 + i * 3) + ', ' + (33 + i * 3) + ']');
+      if (i === 13 || i === 27) push(300);
+    });
+    push(400);
+    DT_NODES.forEach(function (n, i) {
+      var name = n.split('@')[0];
+      push('AppleARMIO: ' + name + ' matched ' + driverFor(name) + ' (score ' + (1000 + (i * 37) % 500) + ')');
+    });
+    push(350);
+    KEXTS.forEach(function (k) { push('kext: ' + k[0] + ' (' + k[1] + ') loaded'); });
+    push('kext: 212 kexts in prelinked cache, 48 started early, rest on demand', 300);
+    KEXTS.forEach(function (k, i) { push('kext: ' + k[0] + ' started (' + ((i * 13) % 41) + ' ms)'); });
+    push(350,
+      'AppleSPMI: 2 controllers, 43 devices enumerated',
+      'ApplePMU: revision 3, 11 regulators online',
+      'ApplePMU: charger: battery 73% (4089 mV), external power: no',
+      'AppleTemp: 9 thermal sensors registered');
+    SENSORS.forEach(function (s) { push('AppleTemp: ' + s[0] + ' = ' + s[1] + '.' + Math.floor(rnd() * 10) + ' C'); });
+    DOMAINS.forEach(function (d, i) { push('IOPower: domain ' + d + ': on (' + (1 + (i * 5) % 7) + ' clients)'); });
+    push('AppleAOP: firmware 1.3.0 loaded (RTKit), 3 endpoints',
+      'AppleAOP: syslog relay enabled',
+      'AppleSensorHub: accelerometer (0x4), gyro (0x8), compass (0x10) online',
+      'AppleAmbientLight: sensor calibrated, 5 gain stages',
+      'AppleHaptics: engine ready, 2 waveform banks',
+      400,
+      'AppleDisplay: panel 1334x750 @ 60 Hz, 8-bit, color mode P3',
+      'AppleDisplay: backlight 0 -> 0 (boot, keep off)');
+    MODES.forEach(function (m, i) { push('AppleDisplay: timing mode ' + i + ': ' + m[0] + ' @ ' + m[1] + ' Hz, pclk ' + m[2] + ' MHz'); });
+    push('AppleDisplay: gamma table 2.2 loaded, 1024 entries',
+      'AppleFramebuffer: 2 layers, 1 overlay, swap interval 1',
+      'AppleGPU: 6 cores, firmware v34.1, 1 GB shared',
+      'AppleGPU: compute ring 0 ready, ring 1 ready',
+      'AppleScaler: 2 pipelines, color space conversion online',
+      'AppleJPEG: hardware codec ready',
+      'AppleVideoEncoder: hardware encoder online (H.264/HEVC)',
+      'AppleVideoDecoder: hardware decoder online',
+      'AppleISP: camera firmware loaded, 2 sensors paired',
+      'AppleAudio: codec ready, 2 outputs 3 inputs, 48 kHz',
+      'AppleAudio: speaker protection table version 7',
+      350,
+      'AppleNVMe: controller ready, firmware 0.1.5',
+      'AppleNVMe: 128 GB, namespace 1 ready, 2 queues of depth 64');
+    SLICES.forEach(function (s, i) {
+      push('AppleStorage: slice ' + (i + 1) + ' lba ' + s[0] + '-' + s[1] + ' type ' + s[2] + ' uuid ' +
+        hex(8).toUpperCase() + '-' + hex(4).toUpperCase() + ' "' + s[3] + '"');
+    });
+    push('AppleEffaceable: 2 lockers online',
+      'apfs: module loaded (1412.141.1)',
+      'apfs: container 0 found, 2 volumes, 128 GB',
+      'apfs: mounted volume "System" (read-only, snapshot)',
+      'apfs: mounted volume "Data" (read-write, 96.3 GB free)',
+      'BSD root: disk0s1s1, major 1, minor 1',
+      'bsd_init: rootvnode ok, /dev populated (144 nodes)',
+      'kern.bootsessionuuid = 5A2C7E1B-9F1C-4D2A-8C4B-0E7F6A1D3B92',
+      450,
+      'apfs: verifying container checkpoint ... ok (41 ms)',
+      'apfs: omap tree: 3 levels, 1842 nodes',
+      'apfs: fsroot tree: 4 levels, 21930 nodes',
+      'apfs: extentref tree: 3 levels, 2210 nodes',
+      'apfs: snapshot metadata tree: 1 level, 2 nodes',
+      'apfs: fext tree: 2 levels, 310 nodes',
+      'apfs: space manager: 32 chunks, 96.3 GB free',
+      'apfs: reaper: 0 objects queued',
+      'apfs: encryption rolling: idle',
+      'apfs: volume "Data" journal replay: 0 transactions',
+      'apfs: snapshot "com.apple.os.update-4C1F2A" sealed, 0 differences',
+      'apfs: keybag unlocked for volume "Data" (class A pending)',
+      'apfs: trim: 18.2 GB queued for discard',
+      'mount: /private/var mounted from disk0s1s2',
+      400,
+      'AppleUSB: host controller online, 1 port (type-A off, lightning on)',
+      'AppleUSB: device mode ready, 3 configurations',
+      'AppleUSBEthernet: interface en2 registered',
+      'AppleWiFi: firmware 9.30.440 loaded, 2 radios (2.4/5 GHz)');
+    CHANNELS.forEach(function (ch) {
+      var freq = ch <= 14 ? 2407 + 5 * ch : 5000 + 5 * ch;
+      push('AppleWiFi: channel ' + ch + ' (' + freq + ' MHz) allowed, max power ' + (ch <= 14 ? 20 : 23) + ' dBm');
+    });
+    push('AppleWiFi: interface en0 registered, country code resolved',
+      'AppleBluetooth: firmware loaded, host interface online',
+      'AppleBaseband: PCIe link up (gen 1, x1)',
+      'AppleBaseband: modem firmware 1.07.02 loaded',
+      'AppleBaseband: SIM tray: present',
+      'AppleNFC: controller ready',
+      'AppleLocation: GNSS receiver online, 0 satellites',
+      350,
+      'AppleTouch: digitizer calibrated, 16x9 sense grid',
+      'AppleButtons: 4 inputs (power, volume up, volume down, ringer)',
+      'AppleHome: home button pressure sensor paired',
+      'AppleBiometric: sensor paired, template store locked',
+      'AppleKeyStore: starting (BUILT: Apr 21 2020 22:08:31)',
+      'AppleSEP: secure enclave link established, 4 mailboxes',
+      'AppleSEP: firmware version 1.0 (build 1738)');
+    for (var m = 0; m < 8; m++) push('AppleSEP: mbox ' + m + ' rx ' + hex(16) + ' ' + hex(16) + ' (ep ' + (m % 4) + ')');
+    push('AppleSEPKeyStore: starting, protection classes 1-4 loaded',
+      'AppleCredentialManager: init: called',
+      'AppleCredentialManager: start: initializing power management',
+      'AppleCredentialManager: start: started',
+      'AppleSSE: key manager online',
+      'AppleTrustCache: 1 cache loaded (static)');
+    SELFTEST.forEach(function (a, i) {
+      push('corecrypto: self-test ' + a + ' vector ' + (i + 1) + ': ' + hex(32) + ' ok (' + (i % 3) + ' ms)');
+    });
+    push(400,
+      'IOSurface: root ready, 0 surfaces',
+      'IOAccelerator: 1 device registered',
+      'IOMobileFramebuffer: display 0 attached, 4 timing modes',
+      'IOHID: event system ready, 7 services',
+      'IOPower: 3 power planes, 2 sleep states',
+      'IONetworking: 3 interfaces, loopback up',
+      'IOAudio: 1 engine, 2 streams',
+      'IOThermal: policy table loaded (12 entries)',
+      'IOReport: 41 channels registered',
+      'IOTimeSync: clock domain 0 ready',
+      'IOText: 1 encryption provider',
+      300,
+      'Darwin Bootstrapper Version 6.0.0: Tue Apr 21 22:22:35 PDT 2020; root:libxpc_private-1738.140.1~1/RELEASE_ARM64_T8010',
+      'launchd: reading /System/Library/LaunchDaemons (214 plists)',
+      'launchd: reading /Library/LaunchDaemons (0 plists)',
+      'launchd: loading system services (214 jobs)');
+    DAEMONS_A.forEach(function (d) { push('launchd: starting com.apple.' + d); });
+    push(300);
+    DAEMONS_B.forEach(function (d, i) { push('launchd: starting com.apple.' + d); if (i === 19) push(300); });
+    push(400,
+      'securityd: keychain opened, 3 keybags',
+      'configd: network configuration loaded, 3 services',
+      'configd: setting hostname to iPhone',
+      'powerd: assertion table ready, 0 assertions',
+      'logd: 2 log stores, 64 MB each',
+      'mediaserverd: 1 audio session, 0 active',
+      'locationd: 0 clients, GNSS idle',
+      'wifid: scanning 0 networks (radio off until unlock)',
+      'bluetoothd: 0 paired devices (store locked)',
+      'CommCenter: baseband attached, radio idle',
+      'lockdown: pairing records: 1',
+      'trustd: 1 trust store, 160 roots',
+      'nfcd: field off',
+      'keybagd: system keybag loaded, 4 classes',
+      'runningboardd: 0 processes tracked',
+      'cfprefsd: 12 domains cached',
+      'distnoted: 0 observers',
+      'mDNSResponder: 3 interfaces, 0 records',
+      350);
+    DAEMONS_C.forEach(function (d) { push('launchd: starting com.apple.' + d); });
+    push('apsd: push transport idle, 0 channels',
+      'mobileactivationd: activation record present, state: activated',
+      'identityservicesd: 0 accounts loaded',
+      300,
+      'launchd: starting com.apple.backboardd',
+      'backboardd: display 0 claimed, 1 layer',
+      'backboardd: hid: 7 services attached',
+      'backboardd: boot UI: progress bar',
+      'launchd: starting com.apple.SpringBoard',
+      'SpringBoard: 1 display, 1 home screen, 0 pending installs',
+      'SpringBoard: boot: handing display to boot UI',
+      450);
+    return L;
+  }
+  var XNU = buildXNU();
+  // Deterministic short gaps inside a burst (ms), cycled. Longest gap well under half a second.
+  var GAP = [0, 65, 0, 130, 35, 0, 200, 45, 0, 90, 0, 0, 155, 20, 260, 0, 55, 0, 110, 35];
 
   /* ---------------- Phase 3: Apple logo + progress bar ----------------
    * [bar width %, pause after in ms] */
-  var PROGRESS = [[0, 1500], [6, 1400], [22, 1600], [38, 1300], [49, 2000], [63, 1500], [80, 1200], [100, 1500]];
+  var PROGRESS = [[0, 1500], [6, 1400], [22, 1600], [38, 1300], [49, 2000], [63, 1500], [80, 1200], [100, 1400]];
 
   /* ---------------- Build the timeline ---------------- */
   var steps = [], T = 0;
@@ -327,11 +372,12 @@
   at(function () { logo.hidden = false; }, 1300);
   PONGO_B.forEach(function (s) { line(s[0], s[1]); });
   at(function () { setPhase('xnu'); }, 150);
-  var k = 0;
+  var XNU_START = T, k = 0, lastAt = T;
   XNU.forEach(function (item) {
-    if (typeof item === 'number') T += item;
-    else line(item, GAP[k++ % GAP.length]);
+    if (typeof item === 'number') T = Math.max(T, lastAt + item);   // stall measured from the last line
+    else { lastAt = T; line(item, GAP[k++ % GAP.length]); }
   });
+  var XNU_END = T;
   at(function () { setPhase('apple'); }, 0);
   PROGRESS.forEach(function (p) { at(function () { setBar(p[0]); }, p[1]); });
   var TOTAL_MS = T;                     // time from start until the bar is full
@@ -417,7 +463,8 @@
     } catch (_) { lock = null; }
   }
 
-  window.LIVEBOOT = { standalone: true, totalMs: TOTAL_MS, lines: ALL_LINES, restart: start };
+  window.LIVEBOOT = { standalone: true, totalMs: TOTAL_MS, lines: ALL_LINES, restart: start,
+    times: steps.map(function (s) { return s.at; }), xnu: [XNU_START, XNU_END] };
 
   drawLogo();
   keepAwake();

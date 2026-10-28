@@ -23,6 +23,7 @@ body {
 #screen {
   position: fixed;
   inset: 0;
+  top: calc(env(safe-area-inset-top, 0px) + 6px);  /* start below the status bar: iOS blurs anything under it */
   overflow: hidden;
   background: #000;
   box-sizing: border-box;

@@ -1,5 +1,5 @@
 /* sw.js — precaches the whole app so it opens instantly and offline once installed. */
-var CACHE = 'liveboot-v2';
+var CACHE = 'liveboot-v3';
 var ASSETS = [
   './',
   './index.html',
