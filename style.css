@@ -1,6 +1,3 @@
-:root {
-  --fg: #e4e4e4;
-}
 html, body {
   margin: 0;
   height: 100%;
@@ -22,19 +19,19 @@ body {
 }
 [hidden] { display: none !important; }
 
-/* Text console: fills the screen, scrolls like a terminal (newest line at the bottom). */
+/* Text console: fills the screen edge to edge, scrolls like a terminal (newest line at the bottom). */
 #screen {
   position: fixed;
   inset: 0;
   overflow: hidden;
   background: #000;
   box-sizing: border-box;
-  padding: 2px 2px 0 3px;
+  padding: 1px 1px 0 2px;
 }
-#screen.pongo { --fs: 8.5px; --lh: 1.2; --fw: 700; }
-#screen.xnu   { --fs: 7px;   --lh: 1.2; --fw: 400; }
+#screen.pongo { --fs: 6.5px; --lh: 1.25; --fg: #fff; }
+#screen.xnu   { --fs: 6px;   --lh: 1.15; --fg: #f2f2f2; }
 #console {
-  font: var(--fw) var(--fs) / var(--lh) Menlo, Monaco, ui-monospace, "SF Mono", "DejaVu Sans Mono", "Liberation Mono", Consolas, monospace;
+  font: 400 var(--fs) / var(--lh) Menlo, Monaco, ui-monospace, "SF Mono", "DejaVu Sans Mono", "Liberation Mono", Consolas, monospace;
   color: var(--fg);
   white-space: pre-wrap;
   overflow-wrap: anywhere;
@@ -42,18 +39,18 @@ body {
   tab-size: 8;
 }
 
-/* Pixel-art logo drawn over the console. */
+/* Pixel-art logo, centred on the screen, drawn over the console text. */
 #logo {
   position: fixed;
   left: 50%;
-  top: 70%;
+  top: 50%;
   transform: translate(-50%, -50%);
   image-rendering: crisp-edges;
   image-rendering: pixelated;
   pointer-events: none;
 }
 
-/* Final phase: Apple logo with boot progress bar. */
+/* Final phase: Apple logo centred, boot progress bar below it. */
 #apple {
   position: fixed;
   inset: 0;
@@ -65,13 +62,13 @@ body {
   top: 50%;
   width: 72px;
   height: 72px;
-  transform: translate(-50%, -58%);
+  transform: translate(-50%, -50%);
   fill: #fff;
 }
 #track {
   position: absolute;
   left: 50%;
-  top: 64%;
+  top: 65%;
   width: 150px;
   height: 4px;
   transform: translateX(-50%);
@@ -87,7 +84,7 @@ body {
   transition: width 0.9s ease-out;
 }
 
-/* Small helper texts. */
+/* Dim replay hint, shown a few seconds after the run has ended. */
 #hint {
   position: fixed;
   left: 0;
@@ -98,15 +95,25 @@ body {
   font: 11px -apple-system, system-ui, sans-serif;
   letter-spacing: 0.02em;
 }
+
+/* Shown instead of the boot when the page is not running as a Home Screen app. */
 #install {
   position: fixed;
-  left: 16px;
-  right: 16px;
-  bottom: calc(18px + env(safe-area-inset-bottom));
-  padding: 10px 14px;
-  border-radius: 10px;
-  background: #1c1c1e;
-  color: #d0d0d0;
-  font: 13px -apple-system, system-ui, sans-serif;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  padding-top: calc(24px + env(safe-area-inset-top));
+  box-sizing: border-box;
+  background: #000;
+  color: #c7c7cc;
+  font: 15px/1.5 -apple-system, system-ui, sans-serif;
   text-align: center;
 }
+#install .card { max-width: 320px; }
+#install h1 { margin: 0 0 12px; font-size: 22px; font-weight: 600; color: #fff; }
+#install p { margin: 0 0 16px; }
+#install ol { margin: 0; padding: 0; list-style: none; text-align: left; }
+#install li { padding: 10px 14px; margin: 6px 0; background: #1c1c1e; border-radius: 10px; }
+#install li b { color: #fff; }

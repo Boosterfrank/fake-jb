@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
   <title>liveboot</title>
-  <meta name="description" content="Fake pongoOS / verbose boot screen. One run of about a minute, no loops.">
+  <meta name="description" content="Fake pongoOS / verbose boot screen. One run of about 45 seconds, no loops.">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -26,7 +26,19 @@
   </div>
 
   <div id="hint" hidden>tap to run again</div>
-  <div id="install" hidden>Share &rarr; Add to Home Screen for the full-screen version</div>
+
+  <div id="install" hidden>
+    <div class="card">
+      <h1>liveboot</h1>
+      <p>This only runs as a Home Screen app.</p>
+      <ol>
+        <li><b>1.</b> Open this page in Safari</li>
+        <li><b>2.</b> Tap <b>Share</b></li>
+        <li><b>3.</b> Tap <b>Add to Home Screen</b></li>
+        <li><b>4.</b> Launch it from the new icon</li>
+      </ol>
+    </div>
+  </div>
 
   <script src="logo.js"></script>
   <script src="app.js"></script>
